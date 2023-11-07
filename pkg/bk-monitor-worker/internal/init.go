@@ -19,7 +19,10 @@ import (
 
 // RegisterTaskHandleFunc async task map, format: task: taskhandler
 var RegisterTaskHandleFunc = map[string]processor.HandlerFunc{
-	"async:test_example": example.HandleExampleTask,
+	"async:test_example":            example.HandleExampleTask,
+	"async:create_es_storage_index": task.CreateEsStorageIndex,
+	"async:publish_redis":           task.PublishRedis,
+	"async:push_space_to_redis":     task.PushSpaceToRedis,
 }
 
 // RegisterPeriodicTaskHandlerFunc periodic task map

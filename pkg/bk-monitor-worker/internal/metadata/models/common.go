@@ -88,7 +88,7 @@ func ParseOptionValue(value interface{}) (string, string, error) {
 	}
 }
 
-// PushToRedis 推送数据到 redis
+// PushToRedis 推送数据到 redis, just for influxdb
 func PushToRedis(ctx context.Context, key, field, value string, isPublish bool) {
 	client, err := dependentredis.GetInstance(ctx)
 	if err != nil {
