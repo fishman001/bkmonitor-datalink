@@ -142,8 +142,11 @@ func (s SpaceRedisSvc) PushAndPublishAllSpace(spaceTypeId, spaceId string, isPub
 
 	// 参数指定是否需要发布通知
 	if isPublish {
-		if err := client.Publish(viper.GetString(SpaceRedisKeyPath), spaceUidList); err != nil {
-			return err
+		redisKey := viper.GetString(SpaceRedisKeyPath)
+		for _, spaceUid := range spaceUidList {
+			if err := client.Publish(redisKey, spaceUid); err != nil {
+				return err
+			}
 		}
 	}
 	return nil
@@ -216,7 +219,7 @@ func (s *SpacePusher) PushBkciTypeSpace(spaceId, tableId string) error {
 	if err := s.getData(spaceTypeId, spaceId, tableId, options); err != nil {
 		return err
 	}
-	if err := s.composeAndPushBizData(spaceTypeId, spaceId, spaceTypeId, spaceId, []map[string]string{{"projectId": spaceId}}, true); err != nil {
+	if err := s.composeAndPushBizData(spaceTypeId, spaceId, spaceTypeId, spaceId, []map[string]interface{}{{"projectId": spaceId}}, true); err != nil {
 		return err
 	}
 	return nil
@@ -324,7 +327,7 @@ func (s *SpacePusher) getData(spaceTypeId, spaceId, tableId string, options *opt
 	return nil
 }
 
-func (s *SpacePusher) composeAndPushBizData(spaceTypeId, spaceId, ResourceType, ResourceId string, dimensionValues []map[string]string, skipSystem bool) error {
+func (s *SpacePusher) composeAndPushBizData(spaceTypeId, spaceId, ResourceType, ResourceId string, dimensionValues []map[string]interface{}, skipSystem bool) error {
 	fieldValue, err := s.composeBizId(spaceTypeId, spaceId, ResourceType, ResourceId, dimensionValues, skipSystem)
 	if err != nil {
 		return err
@@ -345,7 +348,7 @@ func (s *SpacePusher) composeAndPushBizData(spaceTypeId, spaceId, ResourceType, 
 	return nil
 }
 
-func (s *SpacePusher) composeBizId(spaceTypeId, spaceId, ResourceType, ResourceId string, dimensionValues []map[string]string, skipSystem bool) (map[string]string, error) {
+func (s *SpacePusher) composeBizId(spaceTypeId, spaceId, ResourceType, ResourceId string, dimensionValues []map[string]interface{}, skipSystem bool) (map[string]string, error) {
 	fieldValue := make(map[string]string)
 	for tableId, dataId := range s.tableDataIdMap {
 		// 现阶段针对1001下 `system.` 或者 `dbm_system.` 开头的结果表不允许被覆盖
@@ -360,7 +363,6 @@ func (s *SpacePusher) composeBizId(spaceTypeId, spaceId, ResourceType, ResourceI
 			logger.Warnf("space_type [%s], space [%s], data_id [%v], table_id [%s] not found fields", spaceTypeId, spaceId, dataId, tableId)
 		}
 		if !strings.Contains(tableId, ".") {
-			logger.Errorf("table_id [%s] not split by [.]", tableId)
 			continue
 		}
 		measurementType := s.measurementTypeMap[tableId]
@@ -369,14 +371,14 @@ func (s *SpacePusher) composeBizId(spaceTypeId, spaceId, ResourceType, ResourceI
 			logger.Errorf("table_id [%s] not find measurement type", tableId)
 			continue
 		}
-		var filters []map[string]string
+		filters := make([]map[string]interface{}, 0)
 		isNeedAddFilter, err := s.isNeedAddFilter(measurementType, spaceTypeId, spaceId, dataId)
 		if err != nil {
 			return nil, err
 		}
 		if isNeedAddFilter {
 			if len(dimensionValues) == 0 {
-				dimensionValues = []map[string]string{{"bk_biz_id": ResourceId}}
+				dimensionValues = []map[string]interface{}{{"bk_biz_id": ResourceId}}
 			}
 			filters = dimensionValues
 		}
@@ -492,7 +494,7 @@ func (s *SpacePusher) pushBcsResourceForBcsType(spaceTypeId, spaceId, tableId st
 		if !ok {
 			clusterType = models.BcsClusterTypeSingle
 		}
-		var filterData []map[string]interface{}
+		filterData := make([]map[string]interface{}, 0)
 		// 如果为独立集群，则仅需要集群 ID
 		// 如果为共享集群
 		// - 命名空间为空，则忽略
@@ -569,7 +571,7 @@ func (s *SpacePusher) pushSpaceWithType(spaceTypeId, spaceId string) error {
 			"field":            fields,
 			"measurement_type": measurementType,
 			"bk_data_id":       strconv.FormatUint(uint64(dataId), 10),
-			"filters":          make([]string, 0),
+			"filters":          make([]map[string]string, 0),
 			"segmented_enable": s.segmentOptionMap[tableId],
 			"data_label":       s.tableIdTableMap[tableId].DataLabel,
 		})
@@ -864,7 +866,6 @@ func (s *SpacePusher) isNeedAddFilter(measurementType, spaceTypeId, spaceId stri
 	if measurementType == models.MeasurementTypeBkExporter || (ds.EtlConfig == models.ETLConfigTypeBkExporter && measurementType == models.MeasurementTypeBkSplit) {
 		// 如果space_id与data_id所属空间UID相同，则不需要过滤
 		if ds.SpaceUid == fmt.Sprintf("%s__%s", spaceTypeId, spaceId) {
-			logger.Errorf("space [%s__%s], data_id [%v] not found", spaceTypeId, spaceId, dataId)
 			return false, nil
 		}
 		return true, nil
@@ -873,6 +874,7 @@ func (s *SpacePusher) isNeedAddFilter(measurementType, spaceTypeId, spaceId stri
 	var sds space.SpaceDataSource
 	if err := space.NewSpaceDataSourceQuerySet(mysql.GetDBSession().DB).SpaceTypeIdEq(spaceTypeId).SpaceIdEq(spaceId).BkDataIdEq(dataId).One(&sds); err != nil {
 		if gorm.IsRecordNotFoundError(err) {
+			logger.Errorf("SpaceDataSource space [%s__%s], data_id [%v] not found", spaceTypeId, spaceId, dataId)
 			return true, nil
 		} else {
 			return true, err
