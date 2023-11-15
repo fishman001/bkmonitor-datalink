@@ -754,9 +754,6 @@ func (s *SpacePusher) getTableFieldByTableId() (map[string][]string, error) {
 	if err := customreport.NewTimeSeriesGroupQuerySet(mysql.GetDBSession().DB).TableIDIn(tableIdList...).All(&tsGroupList); err != nil {
 		return nil, err
 	}
-	if len(tsGroupList) == 0 {
-		return make(map[string][]string), nil
-	}
 	// 获取时序的结果表及关联的group id
 	var tsGroupIdList []uint
 	tsGroupIdTableIdMap := make(map[uint]string)
@@ -773,8 +770,10 @@ func (s *SpacePusher) getTableFieldByTableId() (map[string][]string, error) {
 	// 针对自定义时序，按照时间过滤数据
 	beginTime := time.Now().UTC().AddDate(0, 0, -viper.GetInt(globalconfig.TimeSeriesMetricExpiredDaysPath))
 	var tsmList []customreport.TimeSeriesMetric
-	if err := customreport.NewTimeSeriesMetricQuerySet(mysql.GetDBSession().DB).GroupIDIn(tsGroupIdList...).LastModifyTimeGte(beginTime).All(&tsmList); err != nil {
-		return nil, err
+	if len(tsGroupIdList) != 0 {
+		if err := customreport.NewTimeSeriesMetricQuerySet(mysql.GetDBSession().DB).GroupIDIn(tsGroupIdList...).LastModifyTimeGte(beginTime).All(&tsmList); err != nil {
+			return nil, err
+		}
 	}
 	// 组装结果表及对应的metric
 	var tableFieldList []map[string]string
@@ -847,7 +846,7 @@ func (s *SpacePusher) isNeedAddFilter(measurementType, spaceTypeId, spaceId stri
 	if !viper.GetBool(globalconfig.IsRestrictDsBelongSpacePath) && (ds.SpaceTypeId == fmt.Sprintf("%s__%s", spaceTypeId, spaceId)) {
 		return false, nil
 	}
-	// 如果不是自定义时序，则不需要关注类似的情况，必须增加过滤条件
+	// 如果不是自定义时序或exporter，则不需要关注类似的情况，必须增加过滤条件
 	tsMeasurementTypes := []string{models.MeasurementTypeBkSplit, models.MeasurementTypeBkStandardV2TimeSeries, models.MeasurementTypeBkExporter}
 	if ds.EtlConfig != models.ETLConfigTypeBkStandardV2TimeSeries {
 		var exist bool
