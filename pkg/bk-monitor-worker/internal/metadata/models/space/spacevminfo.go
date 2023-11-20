@@ -11,24 +11,21 @@ package space
 
 import "github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/internal/metadata/models"
 
-//go:generate goqueryset -in space.go -out qs_space_gen.go
+//go:generate goqueryset -in spacevminfo.go -out qs_spacevminfo_gen.go
 
-// Space space model
+// SpaceVmInfo spacevminfo model
 // gen:qs
-type Space struct {
-	Id          int    `gorm:"primary_key" json:"id"`
-	SpaceTypeId string `gorm:"size:64" json:"spaceTypeId"`
-	SpaceId     string `gorm:"size:128" json:"space_id"`
-	SpaceName   string `gorm:"size:256" json:"space_name"`
-	SpaceCode   string `gorm:"size:64" json:"space_code"`
-	Status      string `gorm:"size:32" json:"status"`
-	TimeZone    string `gorm:"size:32" json:"time_zone"`
-	Language    string `gorm:"size:16" json:"language"`
-	IsBcsValid  bool   `gorm:"column:is_bcs_valid" json:"is_bcs_valid"`
+type SpaceVmInfo struct {
+	ID              uint   `gorm:"column:id;primaryKey" json:"id"`
+	SpaceType       string `gorm:"column:space_type;not null" json:"space_type"`
+	SpaceID         string `gorm:"column:space_id;not null" json:"space_id"`
+	VMClusterID     uint   `gorm:"column:vm_cluster_id;not null" json:"vm_cluster_id"`
+	VMRetentionTime string `gorm:"column:vm_retention_time" json:"vm_retention_time"`
+	Status          string `gorm:"column:status" json:"status"`
 	models.BaseModel
 }
 
 // TableName table alias name
-func (Space) TableName() string {
-	return "metadata_space"
+func (SpaceVmInfo) TableName() string {
+	return "metadata_spacevminfo"
 }

@@ -23,6 +23,7 @@ var RegisterTaskHandleFunc = map[string]processor.HandlerFunc{
 	"async:create_es_storage_index": task.CreateEsStorageIndex,
 	"async:publish_redis":           task.PublishRedis,
 	"async:push_space_to_redis":     task.PushSpaceToRedis,
+	"async:access_bkdata_vm":        task.AccessBkdataVm,
 }
 
 // RegisterPeriodicTaskHandlerFunc periodic task map

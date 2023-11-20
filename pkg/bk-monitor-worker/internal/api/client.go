@@ -19,6 +19,7 @@ import (
 	"github.com/spf13/viper"
 
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/internal/api/bcsclustermanager"
+	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/internal/api/bkdata"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/internal/api/bkgse"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/internal/api/cmdb"
 	"github.com/TencentBlueKing/bkmonitor-datalink/pkg/bk-monitor-worker/internal/api/nodeman"
@@ -33,6 +34,8 @@ var muForCmdbApi sync.Mutex
 
 var muForNodemanApi sync.Mutex
 
+var muForBkdataApi sync.Mutex
+
 var gseApi *bkgse.Client
 
 var bcsClusterManager *bcsclustermanager.Client
@@ -40,6 +43,8 @@ var bcsClusterManager *bcsclustermanager.Client
 var cmdbApi *cmdb.Client
 
 var nodemanApi *nodeman.Client
+
+var bkdataApi *bkdata.Client
 
 const (
 	BkApiBaseUrlPath             = "bk_api.api_url"
@@ -49,6 +54,8 @@ const (
 	BkApiUseApiGatewayPath       = "bk_api.use_api_gateway"
 	BkApiBcsApiGatewayDomainPath = "bk_api.bcs_api_gateway_domain"
 	BkApiBcsApiGatewayTokenPath  = "bk_api.bcs_api_gateway_token"
+	BkApiNodemanApiBaseUrl       = "bk_api.nodeman_api_base_url"
+	BkApiBkdataApiBaseUrl        = "bk_api.bkdata_api_base_url"
 )
 
 // GetGseApi 获取GseApi客户端
@@ -136,8 +143,12 @@ func GetNodemanApi() (*nodeman.Client, error) {
 	if nodemanApi != nil {
 		return nodemanApi, nil
 	}
+	endpoint := viper.GetString(BkApiNodemanApiBaseUrl)
+	if endpoint == "" {
+		endpoint = fmt.Sprintf("%s/api/c/compapi/v2/nodeman/", viper.GetString(BkApiBaseUrlPath))
+	}
 	config := bkapi.ClientConfig{
-		Endpoint:            fmt.Sprintf("%s/api/c/compapi/v2/nodeman/", viper.GetString(BkApiBaseUrlPath)),
+		Endpoint:            endpoint,
 		AuthorizationParams: map[string]string{"bk_username": "admin", "bk_supplier_account": "0"},
 		AppCode:             viper.GetString(BkApiAppCodePath),
 		AppSecret:           viper.GetString(BkApiAppSecretPath),
@@ -150,4 +161,31 @@ func GetNodemanApi() (*nodeman.Client, error) {
 		return nil, err
 	}
 	return nodemanApi, nil
+}
+
+// GetBkdataApi BkdataApi
+func GetBkdataApi() (*bkdata.Client, error) {
+	muForBkdataApi.Lock()
+	defer muForBkdataApi.Unlock()
+	if bkdataApi != nil {
+		return bkdataApi, nil
+	}
+	endpoint := viper.GetString(BkApiBkdataApiBaseUrl)
+	if endpoint == "" {
+		endpoint = fmt.Sprintf("%s/api/c/compapi/data/", viper.GetString(BkApiBaseUrlPath))
+	}
+	config := bkapi.ClientConfig{
+		Endpoint:            endpoint,
+		AuthorizationParams: map[string]string{"bk_username": "admin", "bk_supplier_account": "0"},
+		AppCode:             viper.GetString(BkApiAppCodePath),
+		AppSecret:           viper.GetString(BkApiAppSecretPath),
+		JsonMarshaler:       jsonx.Marshal,
+	}
+
+	var err error
+	bkdataApi, err = bkdata.New(config, bkapi.OptJsonResultProvider(), bkapi.OptJsonBodyProvider())
+	if err != nil {
+		return nil, err
+	}
+	return bkdataApi, nil
 }
